@@ -13,9 +13,8 @@ namespace Folding1BillionEvents
     public class Program
     {
         private EventBase[] eventStream;
-        private List<EventBase> eventStreamEx;
 
-        [GlobalSetup(Targets = new[] { nameof(MutableFold), nameof(ImmutableFold), nameof(MutableFoldWithFilter), nameof(ImmutableFoldWithFilter), nameof(FilterEventStream) })]
+        [GlobalSetup(Targets = new[] { nameof(MutableFold), nameof(ImmutableFold), nameof(FilterEventStream) })]
         public void Setup()
         {
             eventStream = new EventBase[1_000_000_000];
@@ -26,17 +25,34 @@ namespace Folding1BillionEvents
             eventStream.Concat(CreateUserVotedEvents(userId, 400_000_000));
             eventStream.OrderBy(a => Guid.NewGuid()); //randomize
             eventStream[0] = CreateRegisterEvent(userId);
+            Console.WriteLine($"// Numer of Events to Process: {eventStream.Length}");
+        }
+
+        [GlobalSetup(Targets = new[] { nameof(MutableFoldWithFilter), nameof(ImmutableFoldWithFilter) })]
+        public void SetupWithFilters()
+        {
+            eventStream = new EventBase[1_000_000_000];
+            var userId = Guid.NewGuid().ToString();
+            eventStream.Concat(CreateNoopEvents(100_000_000));
+            eventStream.Concat(CreateRoomAssignedEvents(100_000_000));
+            eventStream.Concat(CreateUserChangedEvents(userId, 400_000_000));
+            eventStream.Concat(CreateUserVotedEvents(userId, 400_000_000));
+            eventStream.OrderBy(a => Guid.NewGuid()); //randomize
+            eventStream[0] = CreateRegisterEvent(userId);
+            eventStream = eventStream.Where(e => e is UserRegistered || e is UserChangedName || e is UserVoted).ToArray();
+            Console.WriteLine($"// Numer of Events to Process: {eventStream.Length}");
         }
 
         [GlobalSetup(Targets = new[] { nameof(MutableFoldOnlyUserEvents), nameof(ImmutableFoldOnlyUserEvents) })]
-        public void SetupWithFilter()
+        public void SetupReduced()
         {
-            eventStream = new EventBase[1_000_000_000];
+            eventStream = new EventBase[800_000_000];
             var userId = Guid.NewGuid().ToString();
             eventStream.Concat(CreateUserChangedEvents(userId, 400_000_000));
             eventStream.Concat(CreateUserVotedEvents(userId, 400_000_000));
             eventStream.OrderBy(a => Guid.NewGuid()); //randomize
             eventStream[0] = CreateRegisterEvent(userId);
+            Console.WriteLine($"// Numer of Events to Process: {eventStream.Length}");
         }
 
         [Benchmark]
@@ -49,10 +65,10 @@ namespace Folding1BillionEvents
         public EventBase[] FilterEventStream() => eventStream.Where(e => e is UserRegistered || e is UserChangedName || e is UserVoted).ToArray();
 
         [Benchmark]
-        public User MutableFoldWithFilter() => FoldUser.MuteableFold(eventStream.Where(e => e is UserRegistered || e is UserChangedName || e is UserVoted).ToArray().AsSpan());
+        public User MutableFoldWithFilter() => FoldUser.MuteableFold(eventStream.AsSpan());
 
         [Benchmark]
-        public User ImmutableFoldWithFilter() => FoldUser.ImmuteableFold(eventStream.Where(e => e is UserRegistered || e is UserChangedName || e is UserVoted).ToArray().AsSpan());
+        public User ImmutableFoldWithFilter() => FoldUser.ImmuteableFold(eventStream.AsSpan());
 
         [Benchmark]
         public User MutableFoldOnlyUserEvents() => FoldUser.MuteableFold(eventStream.AsSpan());
