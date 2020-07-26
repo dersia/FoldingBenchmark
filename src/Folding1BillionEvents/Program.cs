@@ -12,73 +12,73 @@ namespace Folding1BillionEvents
     [MemoryDiagnoser]
     public class Program
     {
-        private EventBase[] eventStream;
+        private EventBase[] _eventStream;
 
         [GlobalSetup(Targets = new[] { nameof(MutableFold), nameof(ImmutableFold), nameof(FilterEventStream) })]
         public void Setup()
         {
-            eventStream = new EventBase[1_000_000_000];
+            var eventStream = new List<EventBase>();
             var userId = Guid.NewGuid().ToString();
-            eventStream.Concat(CreateNoopEvents(100_000_000));
-            eventStream.Concat(CreateRoomAssignedEvents(100_000_000));
-            eventStream.Concat(CreateUserChangedEvents(userId, 400_000_000));
-            eventStream.Concat(CreateUserVotedEvents(userId, 400_000_000));
-            eventStream.OrderBy(a => Guid.NewGuid()); //randomize
-            eventStream[0] = CreateRegisterEvent(userId);
-            Console.WriteLine($"// Numer of Events to Process: {eventStream.Length}");
+            eventStream.AddRange(CreateNoopEvents(100_000_000));
+            eventStream.AddRange(CreateRoomAssignedEvents(100_000_000));
+            eventStream.AddRange(CreateUserChangedEvents(userId, 400_000_000));
+            eventStream.AddRange(CreateUserVotedEvents(userId, 400_000_000));
+            _eventStream = eventStream.OrderBy(a => Guid.NewGuid()).ToArray(); //randomize
+            _eventStream[0] = CreateRegisterEvent(userId);
+            Console.WriteLine($"// Numer of Events to Process: {_eventStream.Length}");
         }
 
         [GlobalSetup(Targets = new[] { nameof(MutableFoldWithFilter), nameof(ImmutableFoldWithFilter) })]
         public void SetupWithFilters()
         {
-            eventStream = new EventBase[1_000_000_000];
+            var eventStream = new List<EventBase>();
             var userId = Guid.NewGuid().ToString();
-            eventStream.Concat(CreateNoopEvents(100_000_000));
-            eventStream.Concat(CreateRoomAssignedEvents(100_000_000));
-            eventStream.Concat(CreateUserChangedEvents(userId, 400_000_000));
-            eventStream.Concat(CreateUserVotedEvents(userId, 400_000_000));
-            eventStream.OrderBy(a => Guid.NewGuid()); //randomize
-            eventStream[0] = CreateRegisterEvent(userId);
-            eventStream = eventStream.Where(e => e is UserRegistered || e is UserChangedName || e is UserVoted).ToArray();
-            Console.WriteLine($"// Numer of Events to Process: {eventStream.Length}");
+            eventStream.AddRange(CreateNoopEvents(100_000_000));
+            eventStream.AddRange(CreateRoomAssignedEvents(100_000_000));
+            eventStream.AddRange(CreateUserChangedEvents(userId, 400_000_000));
+            eventStream.AddRange(CreateUserVotedEvents(userId, 400_000_000));
+            _eventStream = eventStream.OrderBy(a => Guid.NewGuid()).ToArray(); //randomize
+            _eventStream[0] = CreateRegisterEvent(userId);
+            _eventStream = _eventStream.Where(e => e is UserRegistered || e is UserChangedName || e is UserVoted).ToArray();
+            Console.WriteLine($"// Numer of Events to Process: {_eventStream.Length}");
         }
 
         [GlobalSetup(Targets = new[] { nameof(MutableFoldOnlyUserEvents), nameof(ImmutableFoldOnlyUserEvents) })]
         public void SetupReduced()
         {
-            eventStream = new EventBase[800_000_000];
+            var eventStream = new List<EventBase>();
             var userId = Guid.NewGuid().ToString();
-            eventStream.Concat(CreateUserChangedEvents(userId, 400_000_000));
-            eventStream.Concat(CreateUserVotedEvents(userId, 400_000_000));
-            eventStream.OrderBy(a => Guid.NewGuid()); //randomize
-            eventStream[0] = CreateRegisterEvent(userId);
-            Console.WriteLine($"// Numer of Events to Process: {eventStream.Length}");
+            eventStream.AddRange(CreateUserChangedEvents(userId, 400_000_000));
+            eventStream.AddRange(CreateUserVotedEvents(userId, 400_000_000));
+            _eventStream = eventStream.OrderBy(a => Guid.NewGuid()).ToArray(); //randomize
+            _eventStream[0] = CreateRegisterEvent(userId);
+            Console.WriteLine($"// Numer of Events to Process: {_eventStream.Length}");
         }
 
         [Benchmark]
-        public User MutableFold() => FoldUser.MuteableFold(eventStream.AsSpan());
+        public User MutableFold() => FoldUser.MuteableFold(_eventStream.AsSpan());
 
         [Benchmark]
-        public User ImmutableFold() => FoldUser.ImmuteableFold(eventStream.AsSpan());
+        public User ImmutableFold() => FoldUser.ImmuteableFold(_eventStream.AsSpan());
 
         [Benchmark]
-        public EventBase[] FilterEventStream() => eventStream.Where(e => e is UserRegistered || e is UserChangedName || e is UserVoted).ToArray();
+        public EventBase[] FilterEventStream() => _eventStream.Where(e => e is UserRegistered || e is UserChangedName || e is UserVoted).ToArray();
 
         [Benchmark]
-        public User MutableFoldWithFilter() => FoldUser.MuteableFold(eventStream.AsSpan());
+        public User MutableFoldWithFilter() => FoldUser.MuteableFold(_eventStream.AsSpan());
 
         [Benchmark]
-        public User ImmutableFoldWithFilter() => FoldUser.ImmuteableFold(eventStream.AsSpan());
+        public User ImmutableFoldWithFilter() => FoldUser.ImmuteableFold(_eventStream.AsSpan());
 
         [Benchmark]
-        public User MutableFoldOnlyUserEvents() => FoldUser.MuteableFold(eventStream.AsSpan());
+        public User MutableFoldOnlyUserEvents() => FoldUser.MuteableFold(_eventStream.AsSpan());
 
         [Benchmark]
-        public User ImmutableFoldOnlyUserEvents() => FoldUser.ImmuteableFold(eventStream.AsSpan());
+        public User ImmutableFoldOnlyUserEvents() => FoldUser.ImmuteableFold(_eventStream.AsSpan());
 
         public static void Main(string[] args) => BenchmarkSwitcher.FromAssemblies(new[] { typeof(Program).Assembly }).Run(args);
 
-        public IEnumerable<EventBase> CreateUserChangedEvents(string userId, int count)
+        public static IEnumerable<EventBase> CreateUserChangedEvents(string userId, int count)
         {
             for(int i = 0;i<count;i++)
             {
@@ -86,7 +86,7 @@ namespace Folding1BillionEvents
             }
         }
 
-        public IEnumerable<EventBase> CreateUserVotedEvents(string userId, int count)
+        public static IEnumerable<EventBase> CreateUserVotedEvents(string userId, int count)
         {
             for (int i = 0; i < count; i++)
             {
@@ -94,7 +94,7 @@ namespace Folding1BillionEvents
             }
         }
 
-        public IEnumerable<EventBase> CreateNoopEvents(int count)
+        public static IEnumerable<EventBase> CreateNoopEvents(int count)
         {
             for (int i = 0; i < count; i++)
             {
@@ -102,7 +102,7 @@ namespace Folding1BillionEvents
             }
         }
 
-        public IEnumerable<EventBase> CreateRoomAssignedEvents(int count)
+        public static IEnumerable<EventBase> CreateRoomAssignedEvents(int count)
         {
             for (int i = 0; i < count; i++)
             {
@@ -111,7 +111,7 @@ namespace Folding1BillionEvents
         }
 
 
-        public EventBase CreateRegisterEvent(string userId)
+        public static EventBase CreateRegisterEvent(string userId)
         {
             return new UserRegistered
             {
@@ -121,7 +121,7 @@ namespace Folding1BillionEvents
             };
         }
 
-        public EventBase CreateUserChangedNameEvent(string userId, string suffix)
+        public static EventBase CreateUserChangedNameEvent(string userId, string suffix)
         {
             return new UserChangedName
             {
@@ -131,7 +131,7 @@ namespace Folding1BillionEvents
             };
         }
 
-        public EventBase CreateUserVotedEvent(string userId)
+        public static EventBase CreateUserVotedEvent(string userId)
         {
             return new UserVoted
             {
@@ -139,12 +139,12 @@ namespace Folding1BillionEvents
             };
         }
 
-        public EventBase CreateNoopEvent()
+        public static EventBase CreateNoopEvent()
         {
             return new NoopEvent();
         }
 
-        public EventBase CreateRoomAssignedEvent(string roomId)
+        public static EventBase CreateRoomAssignedEvent(string roomId)
         {
             return new RoomAssigned
             {
